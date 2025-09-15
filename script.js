@@ -1,5 +1,3 @@
-// 核心：请在这里填入你的 Covalent API Key。这是免费的。
-const COVALENT_API_KEY = 'YOUR_COVALENT_API_KEY';
 // 核心：请在这里填入你的 Infura/Alchemy API Key。这是免费的。
 const RPC_API_KEY = 'HyoLOvIUo+BOj8YczOlgHbXkkaEM2E/S73PspQjRLJfSiCA7F0YbmA';
 
@@ -173,14 +171,14 @@ document.getElementById('downloadButton').addEventListener('click', () => {
     let csvContent = 'Address,Balance,Symbol\n';
     
     rows.forEach(row => {
-        if (row.includes(':')) {
-            const parts = row.split(':');
-            const address = parts[0].trim();
-            const balanceAndSymbol = parts[1].trim().split(' ');
-            const balance = balanceAndSymbol[0];
-            const symbol = balanceAndSymbol[1];
-            csvContent += `"${address}","${balance}","${symbol}"\n`;
-        }
+            if (row.includes(':')) {
+                const parts = row.split(':');
+                const address = parts[0].trim();
+                const balanceAndSymbol = parts[1].trim().split(' ');
+                const balance = balanceAndSymbol[0];
+                const symbol = balanceAndSymbol[1];
+                csvContent += `"${address}","${balance}","${symbol}"\n`;
+            }
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -212,44 +210,44 @@ document.getElementById('checkButton').addEventListener('click', async () => {
     let output = '';
     const BATCH_SIZE = 10;
     const DELAY_MS = 100;
+    
+    let providerUrl;
+    if (customRpcUrl) {
+        providerUrl = customRpcUrl;
+    } else {
+        const rpcMap = {
+            '1': `https://mainnet.infura.io/v3/${RPC_API_KEY}`,
+            '137': `https://polygon-mainnet.infura.io/v3/${RPC_API_KEY}`,
+            '56': 'https://bsc-dataseed.bnbchain.org'
+        };
+        providerUrl = rpcMap[chainId];
 
-    if (tokenAddress || customRpcUrl) {
-        let providerUrl;
-        if (customRpcUrl) {
-            providerUrl = customRpcUrl;
-        } else {
-            const rpcMap = {
-                '1': `https://mainnet.infura.io/v3/${RPC_API_KEY}`,
-                '137': `https://polygon-mainnet.infura.io/v3/${RPC_API_KEY}`,
-                '56': 'https://bsc-dataseed.bnbchain.org'
-            };
-            providerUrl = rpcMap[chainId];
-
-            if (providerUrl.includes('YOUR_INFURA_API_KEY') && !customRpcUrl) {
-                resultsElement.textContent = '请先在脚本中配置您的 Infura/Alchemy API Key。';
-                return;
-            }
+        if (providerUrl.includes('YOUR_INFURA_API_KEY') && !customRpcUrl) {
+            resultsElement.textContent = '请先在脚本中配置您的 Infura/Alchemy API Key。';
+            return;
         }
-        
-        try {
-            const provider = new ethers.providers.JsonRpcProvider(providerUrl);
-            const isCustomToken = !!tokenAddress;
-            const erc20Abi = isCustomToken ? ["function balanceOf(address owner) view returns (uint256)", "function symbol() view returns (string)", "function decimals() view returns (uint8)"] : null;
-            const tokenContract = isCustomToken ? new ethers.Contract(tokenAddress, erc20Abi, provider) : null;
-            const promises = [];
+    }
+    
+    try {
+        const provider = new ethers.providers.JsonRpcProvider(providerUrl);
+        const isCustomToken = !!tokenAddress;
+        const promises = [];
 
-            for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
-                const batch = addresses.slice(i, i + BATCH_SIZE);
-                const batchPromises = batch.map(async (address) => {
-                    if (!ethers.utils.isAddress(address)) {
-                        return { address, error: '地址格式错误。' };
-                    }
-                    
-                    let balance = 0;
-                    let symbol = '';
-                    
-                    try {
-                        if (isCustomToken) {
+        for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+            const batch = addresses.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(async (address) => {
+                if (!ethers.utils.isAddress(address)) {
+                    return { address, error: '地址格式错误。' };
+                }
+                
+                try {
+                    let balance, symbol;
+
+                    // 尝试查询代币余额
+                    if (isCustomToken) {
+                        try {
+                            const erc20Abi = ["function balanceOf(address owner) view returns (uint256)", "function symbol() view returns (string)", "function decimals() view returns (uint8)"];
+                            const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, provider);
                             const [rawBalance, tokenSymbol, tokenDecimals] = await Promise.all([
                                 tokenContract.balanceOf(address),
                                 tokenContract.symbol(),
@@ -257,68 +255,31 @@ document.getElementById('checkButton').addEventListener('click', async () => {
                             ]);
                             balance = ethers.utils.formatUnits(rawBalance, tokenDecimals);
                             symbol = tokenSymbol;
-                        } else {
-                            const rawBalance = await provider.getBalance(address);
-                            balance = ethers.utils.formatEther(rawBalance);
-                            const network = await provider.getNetwork();
-                            symbol = network.name === 'homestead' ? 'ETH' : network.name.toUpperCase();
+                            return { address, balance, symbol };
+                        } catch (err) {
+                            // 如果代币查询失败，继续尝试查询原生币
+                            console.warn(`代币查询失败，尝试查询原生币:`, err.message);
                         }
-                        return { address, balance, symbol };
-                    } catch (err) {
-                        return { address, error: '查询失败。' };
                     }
-                });
-                
-                promises.push(...batchPromises);
-                
-                await new Promise(resolve => setTimeout(resolve, DELAY_MS));
-            }
 
-            const results = await Promise.all(promises);
-            results.forEach(res => {
-                if (res.error) {
-                    output += `${res.address}: ${res.error}\n`;
-                } else {
-                    output += `${res.address}: ${res.balance} ${res.symbol}\n`;
+                    // 回退到查询原生币余额
+                    const rawBalance = await provider.getBalance(address);
+                    balance = ethers.utils.formatEther(rawBalance);
+                    const network = await provider.getNetwork();
+                    symbol = network.name === 'homestead' ? 'ETH' : network.name.toUpperCase();
+                    
+                    return { address, balance, symbol };
+                } catch (err) {
+                    return { address, error: '查询失败。' };
                 }
             });
-        } catch (err) {
-            output = `RPC查询过程中出现错误：${err.message || err}`;
-            console.error(err);
-        }
-    } 
-    else {
-        if (!COVALENT_API_KEY) {
-            resultsElement.textContent = '请先在脚本中配置您的 Covalent API Key。';
-            return;
-        }
-
-        const results = [];
-        for (let i = 0; i < addresses.length; i++) {
-            const address = addresses[i];
-            const url = `https://api.covalenthq.com/v1/${chainId}/address/${address}/balances_v2/?key=${COVALENT_API_KEY}`;
             
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data.data && data.data.items) {
-                    const nativeToken = data.data.items.find(item => item.native_token);
-                    if (nativeToken) {
-                        const balance = nativeToken.balance / Math.pow(10, nativeToken.contract_decimals);
-                        results.push({ address, balance, symbol: nativeToken.contract_ticker_symbol });
-                    } else {
-                        results.push({ address, error: '找不到主网币余额。' });
-                    }
-                } else {
-                    results.push({ address, error: 'API查询失败。' });
-                }
-            } catch (err) {
-                results.push({ address, error: '网络错误或查询失败。' });
-            }
+            promises.push(...batchPromises);
+            
             await new Promise(resolve => setTimeout(resolve, DELAY_MS));
         }
-        
+
+        const results = await Promise.all(promises);
         results.forEach(res => {
             if (res.error) {
                 output += `${res.address}: ${res.error}\n`;
@@ -326,6 +287,9 @@ document.getElementById('checkButton').addEventListener('click', async () => {
                 output += `${res.address}: ${res.balance} ${res.symbol}\n`;
             }
         });
+    } catch (err) {
+        output = `RPC查询过程中出现错误：${err.message || err}`;
+        console.error(err);
     }
 
     currentQueryData = {
