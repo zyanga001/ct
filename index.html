@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多链批量余额查询</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <header class="main-header">
+            <h1>多链批量余额查询工具</h1>
+            <p class="subtitle">每秒百次查询 | 私密本地存储 | 免费开源</p>
+        </header>
+
+        <main class="main-content">
+            <section class="section">
+                <h2>1. 输入地址和配置</h2>
+                <p>粘贴多个地址，选择您想查询的区块链网络。查询自定义代币或冷门链时，可填写下方选项。</p>
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="chainSelect">选择预设链:</label>
+                        <select id="chainSelect">
+                            <option value="1">以太坊主网 (ETH)</option>
+                            <option value="137">Polygon (MATIC)</option>
+                            <option value="56">BNB Chain (BNB)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="customRpcUrl">或输入自定义RPC URL:</label>
+                        <input type="text" id="customRpcUrl" placeholder="例如: https://.../mainnet">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="tokenAddress">代币合约地址 (可选):</label>
+                        <input type="text" id="tokenAddress" placeholder="例如: 0x... (USDT)">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <textarea id="addressInput" rows="5" placeholder="请在此粘贴多个地址，每行一个。"></textarea>
+                    <button id="checkButton">查询</button>
+                </div>
+            </section>
+            
+            <hr>
+
+            <section class="section">
+                <h2>2. 查看结果并管理</h2>
+                <p>查询结果将在下方显示。您可以一键保存到本地或导出为CSV报告。</p>
+                <div class="result-box">
+                    <p>查询结果:</p>
+                    <pre id="results"></pre>
+                    <div class="result-actions">
+                        <button id="saveButton" style="display: none;">保存到历史记录</button>
+                        <button id="downloadButton" style="display: none;">下载 CSV 文件</button>
+                    </div>
+                </div>
+            </section>
+
+            <hr>
+
+            <section class="section">
+                <h2>3. 管理和追溯历史记录</h2>
+                <p>所有查询都按地址群分组存储在本地，随时加载或删除。</p>
+                <ul id="historyList">
+                    <li style="text-align: center; color: #888;">暂无历史记录</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
